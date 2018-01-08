@@ -1,55 +1,19 @@
-# Copyright 2015 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-# pylint: disable=invalid-name
-"""ResNet50 model for Keras.
-
-# Reference:
-
-- [Deep Residual Learning for Image
-Recognition](https://arxiv.org/abs/1512.03385)
-
-Adapted from code contributed by BigMoyan.
-"""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import os
-
+import tensorflow as tf
 from tensorflow.python.keras._impl.keras import backend as K
 from tensorflow.python.keras._impl.keras import layers
-from tensorflow.python.keras._impl.keras.applications.imagenet_utils import _obtain_input_shape
-from tensorflow.python.keras._impl.keras.applications.imagenet_utils import decode_predictions  # pylint: disable=unused-import
-from tensorflow.python.keras._impl.keras.applications.imagenet_utils import preprocess_input  # pylint: disable=unused-import
-from tensorflow.python.keras._impl.keras.engine.topology import get_source_inputs
+from tensorflow.python.ops.array_ops import split
 from tensorflow.python.keras._impl.keras.layers import Activation
-from tensorflow.python.keras._impl.keras.layers import AveragePooling2D
 from tensorflow.python.keras._impl.keras.layers import BatchNormalization
 from tensorflow.python.keras._impl.keras.layers import Conv2D
 from tensorflow.python.keras._impl.keras.layers import Conv2DTranspose
 from tensorflow.python.keras._impl.keras.layers import Dense
-from tensorflow.python.keras._impl.keras.layers import Flatten
-from tensorflow.python.keras._impl.keras.layers import GlobalAveragePooling2D
-from tensorflow.python.keras._impl.keras.layers import GlobalMaxPooling2D
 from tensorflow.python.keras._impl.keras.layers import Input
 from tensorflow.python.keras._impl.keras.layers import MaxPooling2D
-from tensorflow.python.keras._impl.keras.models import Model
-from tensorflow.python.keras._impl.keras.utils.data_utils import get_file
-
-WEIGHTS_PATH = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.2/resnet50_weights_tf_dim_ordering_tf_kernels.h5'
-WEIGHTS_PATH_NO_TOP = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.2/resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5'
 
 
 def identity_block(input_tensor, kernel_size, filters, stage, block):
@@ -125,15 +89,12 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2))
         return x
 
 
-def PoseNet(include_top=True, weights='imagenet', input_tensor=None, input_shape=None, pooling=None, classes=1000):
-        """Instantiates the ResNet50 architecture.
-
-  
+def PoseNet(input_tensor=None, input_shape=None):
+        """
         """
 
         # Determine proper input shape
-        input_shape = _obtain_input_shape(input_shape, default_size=224, min_size=197, data_format=K.image_data_format(), require_flatten=include_top, weights=weights)
-
+        input_shape = (368, 368, 3)
         if input_tensor is None:
                 img_input = Input(shape=input_shape)
         else:
@@ -166,47 +127,38 @@ def PoseNet(include_top=True, weights='imagenet', input_tensor=None, input_shape
 
         x = conv_block(x, 3, [512, 512, 1024], stage=5, block='a')
 
-        x = Conv2D(256, 1, name='res5b_branch2a')(x)
+        x = Conv2D(256, 1, name='res5b_branch2a_new')(x)
         x = Activation('relu', name='res5b_branch2a_relu')(x)
 
-        x = Conv2D(128, 3, padding='same', name='res5b_branch2b')(x)
+        x = Conv2D(128, 3, padding='same', name='res5b_branch2b_new')(x)
         x = Activation('relu', name='res5b_branch2b_relu')(x)
 
-        x = Conv2D(256, 1, name='res5b_branch2c')(x)
-        x = Activation('relu', name='res5b_branch2c_relu')(x)
+        x = Conv2D(256, 1, name='res5b_branch2c_new')(x)
+        res_5b = Activation('relu', name='res5b_relu')(x)
 
-        x = Conv2DTranspose(63, 4, strides=(2, 2), padding='same', use_bias=False, name='res5c_branch1a')(x)
-        # TODO
-        # res5c_brach1 层后面的层
-        x = AveragePooling2D((7, 7), name='avg_pool')(x)
-        # x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2c')(x)
+        x = Conv2DTranspose(63, 4, strides=(2, 2), padding='same', use_bias=False, name='res5c_branch1a')(res_5b)
+        delta_x, delta_y, delta_z = split(x, [21, 21, 21], axis=bn_axis, name='split_res5c_branch1a')
+        sqr = layers.multiply([x, x], name='res5c_branch1a_sqr')
+        x_sqr, y_sqr, z_sqr = split(sqr, [21, 21, 21], axis=bn_axis, name='split_res5c_branch1a_sqr')
+        bone_length_sqr = layers.add([x_sqr, y_sqr, z_sqr], name='res5c_bone_length_sqr')
+        res5c_bone_length = tf.pow(bone_length_sqr, 0.5, name='res5c_bone_length')
 
-        if include_top:
-                x = Flatten()(x)
-                x = Dense(classes, activation='softmax', name='fc1000')(x)
-        else:
-                if pooling == 'avg':
-                        x = GlobalAveragePooling2D()(x)
-                elif pooling == 'max':
-                        x = GlobalMaxPooling2D()(x)
+        x = Conv2DTranspose(128, 4, strides=(2, 2), padding='same', use_bias=False, name='res5c_branch2a')(res_5b)
+        x = BatchNormalization(axis=bn_axis, name='bn5c_branch2a')(x)
+        x = Activation('relu', name='res5c_branch2a_relu')(x)
+        x = layers.concatenate([x, delta_x, delta_y, delta_z, res5c_bone_length], axis=bn_axis, name="res5c_branch2a_feat")
+        x = Conv2D(128, 3, padding='same', name='res5c_branch2b')(x)
+        x = Activation('relu', name='res5c_branch2b_relu')(x)
+        x = Conv2D(84, 1, use_bias=False, name='res5c_branch2c')(x)
+        heatmap, x_heatmap, y_heatmap, z_heatmap = split(x, [21, 21, 21, 21], axis=bn_axis, name='slice_heatmaps')
 
-        # Ensure that the model takes into account
-        # any potential predecessors of `input_tensor`.
-        if input_tensor is not None:
-                inputs = get_source_inputs(input_tensor)
-        else:
-                inputs = img_input
-        # Create model.
-        model = Model(inputs, x, name='resnet50')
-
-        return model
+        return heatmap, x_heatmap, y_heatmap, z_heatmap
 
 
 def main():
         temp = PoseNet()
-        print(temp.name)
-        for operation in temp.layers:
-                print("Operation:", operation.name)
+        for item in temp:
+                print("Operation:", item.shape)
 
 
 if __name__ == '__main__':
