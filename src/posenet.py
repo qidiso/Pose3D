@@ -14,6 +14,10 @@ from tensorflow.python.keras._impl.keras.layers import Conv2DTranspose
 from tensorflow.python.keras._impl.keras.layers import Dense
 from tensorflow.python.keras._impl.keras.layers import Input
 from tensorflow.python.keras._impl.keras.layers import MaxPooling2D
+import h5py
+import numpy as np
+from matplotlib import pyplot as plt
+import cv2
 
 
 def identity_block(input_tensor, kernel_size, filters, stage, block):
@@ -89,76 +93,112 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2))
         return x
 
 
-def PoseNet(input_tensor=None, input_shape=None):
+def PoseNet(input_shape=(None, 368, 368, 3)):
         """
         """
 
         # Determine proper input shape
-        input_shape = (368, 368, 3)
-        if input_tensor is None:
-                img_input = Input(shape=input_shape)
-        else:
-                img_input = Input(tensor=input_tensor, shape=input_shape)
+        img_input = tf.placeholder(tf.float32, shape=input_shape, name='img_input')
 
         if K.image_data_format() == 'channels_last':
                 bn_axis = 3
         else:
                 bn_axis = 1
 
-        x = Conv2D(64, (7, 7), strides=(2, 2), padding='same', name='conv1')(img_input)
-        x = Activation('relu', name='conv1_relu')(x)
-        x = MaxPooling2D((3, 3), strides=(2, 2), name='pool1')(x)
+        with tf.variable_scope("vnect"):
+                net = Conv2D(64, (7, 7), strides=(2, 2), padding='same', name='conv1')(img_input)
+                net = Activation('relu', name='conv1_relu')(net)
+                net = MaxPooling2D((3, 3), strides=(2, 2), name='pool1')(net)
 
-        x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1))
-        x = identity_block(x, 3, [64, 64, 256], stage=2, block='b')
-        x = identity_block(x, 3, [64, 64, 256], stage=2, block='c')
+                net = conv_block(net, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1))
+                net = identity_block(net, 3, [64, 64, 256], stage=2, block='b')
+                net = identity_block(net, 3, [64, 64, 256], stage=2, block='c')
 
-        x = conv_block(x, 3, [128, 128, 512], stage=3, block='a')
-        x = identity_block(x, 3, [128, 128, 512], stage=3, block='b')
-        x = identity_block(x, 3, [128, 128, 512], stage=3, block='c')
-        x = identity_block(x, 3, [128, 128, 512], stage=3, block='d')
+                net = conv_block(net, 3, [128, 128, 512], stage=3, block='a')
+                net = identity_block(net, 3, [128, 128, 512], stage=3, block='b')
+                net = identity_block(net, 3, [128, 128, 512], stage=3, block='c')
+                net = identity_block(net, 3, [128, 128, 512], stage=3, block='d')
 
-        x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a')
-        x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b')
-        x = identity_block(x, 3, [256, 256, 1024], stage=4, block='c')
-        x = identity_block(x, 3, [256, 256, 1024], stage=4, block='d')
-        x = identity_block(x, 3, [256, 256, 1024], stage=4, block='e')
-        x = identity_block(x, 3, [256, 256, 1024], stage=4, block='f')
+                net = conv_block(net, 3, [256, 256, 1024], stage=4, block='a')
+                net = identity_block(net, 3, [256, 256, 1024], stage=4, block='b')
+                net = identity_block(net, 3, [256, 256, 1024], stage=4, block='c')
+                net = identity_block(net, 3, [256, 256, 1024], stage=4, block='d')
+                net = identity_block(net, 3, [256, 256, 1024], stage=4, block='e')
+                net = identity_block(net, 3, [256, 256, 1024], stage=4, block='f')
 
-        x = conv_block(x, 3, [512, 512, 1024], stage=5, block='a')
+                net = conv_block(net, 3, [512, 512, 1024], stage=5, block='a')
 
-        x = Conv2D(256, 1, name='res5b_branch2a_new')(x)
-        x = Activation('relu', name='res5b_branch2a_relu')(x)
+                net = Conv2D(256, 1, name='res5b_branch2a_new')(net)
+                net = Activation('relu', name='res5b_branch2a_relu')(net)
 
-        x = Conv2D(128, 3, padding='same', name='res5b_branch2b_new')(x)
-        x = Activation('relu', name='res5b_branch2b_relu')(x)
+                net = Conv2D(128, 3, padding='same', name='res5b_branch2b_new')(net)
+                net = Activation('relu', name='res5b_branch2b_relu')(net)
 
-        x = Conv2D(256, 1, name='res5b_branch2c_new')(x)
-        res_5b = Activation('relu', name='res5b_relu')(x)
+                net = Conv2D(256, 1, name='res5b_branch2c_new')(net)
+                res_5b = Activation('relu', name='res5b_relu')(net)
 
-        x = Conv2DTranspose(63, 4, strides=(2, 2), padding='same', use_bias=False, name='res5c_branch1a')(res_5b)
-        delta_x, delta_y, delta_z = split(x, [21, 21, 21], axis=bn_axis, name='split_res5c_branch1a')
-        sqr = layers.multiply([x, x], name='res5c_branch1a_sqr')
-        x_sqr, y_sqr, z_sqr = split(sqr, [21, 21, 21], axis=bn_axis, name='split_res5c_branch1a_sqr')
-        bone_length_sqr = layers.add([x_sqr, y_sqr, z_sqr], name='res5c_bone_length_sqr')
-        res5c_bone_length = tf.pow(bone_length_sqr, 0.5, name='res5c_bone_length')
+                net = Conv2DTranspose(63, 4, strides=(2, 2), padding='same', use_bias=False, name='res5c_branch1a')(res_5b)
+                delta_x, delta_y, delta_z = split(net, [21, 21, 21], axis=bn_axis, name='split_res5c_branch1a')
+                sqr = layers.multiply([net, net], name='res5c_branch1a_sqr')
+                x_sqr, y_sqr, z_sqr = split(sqr, [21, 21, 21], axis=bn_axis, name='split_res5c_branch1a_sqr')
+                bone_length_sqr = layers.add([x_sqr, y_sqr, z_sqr], name='res5c_bone_length_sqr')
+                res5c_bone_length = tf.pow(bone_length_sqr, 0.5, name='res5c_bone_length')
 
-        x = Conv2DTranspose(128, 4, strides=(2, 2), padding='same', use_bias=False, name='res5c_branch2a')(res_5b)
-        x = BatchNormalization(axis=bn_axis, name='bn5c_branch2a')(x)
-        x = Activation('relu', name='res5c_branch2a_relu')(x)
-        x = layers.concatenate([x, delta_x, delta_y, delta_z, res5c_bone_length], axis=bn_axis, name="res5c_branch2a_feat")
-        x = Conv2D(128, 3, padding='same', name='res5c_branch2b')(x)
-        x = Activation('relu', name='res5c_branch2b_relu')(x)
-        x = Conv2D(84, 1, use_bias=False, name='res5c_branch2c')(x)
-        heatmap, x_heatmap, y_heatmap, z_heatmap = split(x, [21, 21, 21, 21], axis=bn_axis, name='slice_heatmaps')
+                net = Conv2DTranspose(128, 4, strides=(2, 2), padding='same', use_bias=False, name='res5c_branch2a')(res_5b)
+                net = BatchNormalization(axis=bn_axis, name='bn5c_branch2a')(net)
+                net = Activation('relu', name='res5c_branch2a_relu')(net)
+                net = layers.concatenate([net, delta_x, delta_y, delta_z, res5c_bone_length], axis=bn_axis, name="res5c_branch2a_feat")
+                net = Conv2D(128, 3, padding='same', name='res5c_branch2b')(net)
+                net = Activation('relu', name='res5c_branch2b_relu')(net)
+                net = Conv2D(84, 1, use_bias=False, name='res5c_branch2c')(net)
+                heatmap, x_heatmap, y_heatmap, z_heatmap = split(net, [21, 21, 21, 21], axis=bn_axis, name='slice_heatmaps')
+        return img_input, (heatmap, x_heatmap, y_heatmap, z_heatmap)
 
-        return heatmap, x_heatmap, y_heatmap, z_heatmap
+
+def load_weights(sess, model_file):
+        f = h5py.File(model_file, 'r')
+        keys = {'kernel': 'weights', 'bias': 'bias'}
+        params = tf.global_variables(scope="vnect")
+        for v in params:
+                [_, name, content] = v.name[:-2].split('/')
+                print(name, content)
+                if name[:2] == 'bn':
+                        if content == 'gamma':
+                                sess.run(v.assign(f['scale5c_branch2a']['weights'][:].T))
+                        elif content == 'beta':
+                                sess.run(v.assign(f['scale5c_branch2a']['bias'][:].T))
+                        elif content == 'moving_mean':
+                                sess.run(v.assign(f['bn5c_branch2a']['weights'][:].T))
+                        elif content == 'moving_variance':
+                                sess.run(v.assign(f['bn5c_branch2a']['bias'][:].T))
+                else:
+                        if name[:12] == 'res5a_branch':
+                                name = name + '_new'
+                        sess.run(v.assign(f[name][keys[content]][:].T))
+        f.close()
 
 
 def main():
-        temp = PoseNet()
-        for item in temp:
-                print("Operation:", item.shape)
+        image_shape = (None, 540, 540, 3)
+        img_file = '../dataset/mpii_3dhp_ts6/cam5_frame000160.jpg'
+        img = cv2.imread(img_file)
+        img = img[:540, 150:690]
+        K.set_learning_phase(False)
+        img_input, (heatmap, x_heatmap, y_heatmap, z_heatmap) = PoseNet(input_shape=image_shape)
+
+        with tf.Session() as sess:
+                sess.run(tf.global_variables_initializer())
+                load_weights(sess, 'vnect_model.h5')
+                out_img = sess.run(heatmap, feed_dict={img_input: [img]})
+        print(out_img.shape, out_img.dtype)
+
+        plt.imshow(img)
+        plt.show()
+        for i in range(21):
+                plt.imshow(out_img[0, :, :, i])
+                plt.grid(True)
+                plt.colorbar()
+                plt.show()
 
 
 if __name__ == '__main__':
