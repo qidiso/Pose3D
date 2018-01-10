@@ -128,7 +128,7 @@ def PoseNet(input_shape=(None, 368, 368, 3)):
                 net = identity_block(net, 3, [256, 256, 1024], stage=4, block='e')
                 net = identity_block(net, 3, [256, 256, 1024], stage=4, block='f')
 
-                net = conv_block(net, 3, [512, 512, 1024], stage=5, block='a', relu_alpha=0.01)
+                net = conv_block(net, 3, [512, 512, 1024], stage=5, block='a', strides=(1, 1), relu_alpha=0.01)
                 net = Conv2D(256, 1, name='res5b_branch2a_new')(net)
                 net = Activation('relu', name='res5b_branch2a_relu')(net)
 
