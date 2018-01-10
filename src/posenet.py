@@ -41,13 +41,13 @@ def identity_block(input_tensor, kernel_size, filters, stage, block):
                 bn_axis = 1
         conv_name_base = 'res' + str(stage) + block + '_branch'
 
-        x = Conv2D(filters1, (1, 1), name=conv_name_base + '2a')(input_tensor)
+        x = Conv2D(filters1, 1, name=conv_name_base + '2a')(input_tensor)
         x = Activation('relu', name=conv_name_base + '2a' + '_relu')(x)
 
         x = Conv2D(filters2, kernel_size, padding='same', name=conv_name_base + '2b')(x)
         x = Activation('relu', name=conv_name_base + '2b' + '_relu')(x)
 
-        x = Conv2D(filters3, (1, 1), name=conv_name_base + '2c')(x)
+        x = Conv2D(filters3, 1, name=conv_name_base + '2c')(x)
 
         x = layers.add([x, input_tensor], name='res' + str(stage) + block)
         x = Activation('relu', name='res' + str(stage) + block + '_relu')(x)
@@ -79,15 +79,15 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2),
                 bn_axis = 1
         conv_name_base = 'res' + str(stage) + block + '_branch'
 
-        x = Conv2D(filters1, (1, 1), strides=strides, name=conv_name_base + '2a')(input_tensor)
+        x = Conv2D(filters1, 1, strides=strides, name=conv_name_base + '2a')(input_tensor)
         x = Activation('relu', name=conv_name_base + '2a' + '_relu')(x)
 
         x = Conv2D(filters2, kernel_size, padding='same', name=conv_name_base + '2b')(x)
         x = Activation('relu', name=conv_name_base + '2b' + '_relu')(x)
 
-        x = Conv2D(filters3, (1, 1), name=conv_name_base + '2c')(x)
+        x = Conv2D(filters3, 1, name=conv_name_base + '2c')(x)
 
-        shortcut = Conv2D(filters3, (1, 1), strides=strides, name=conv_name_base + '1')(input_tensor)
+        shortcut = Conv2D(filters3, 1, strides=strides, name=conv_name_base + '1')(input_tensor)
 
         x = layers.add([x, shortcut], name='res' + str(stage) + block)
         x = LeakyReLU(alpha=relu_alpha, name='res' + str(stage) + block + '_relu')(x)
@@ -107,7 +107,8 @@ def PoseNet(input_shape=(None, 368, 368, 3)):
                 bn_axis = 1
 
         with tf.variable_scope("vnect"):
-                net = Conv2D(64, (7, 7), strides=(2, 2), padding='same', name='conv1')(img_input)
+                padded_input = tf.pad(img_input, [[0, 0], [3, 3], [3, 3], [0, 0]], "CONSTANT")
+                net = Conv2D(64, 7, strides=(2, 2), name='conv1')(padded_input)
                 net = Activation('relu', name='conv1_relu')(net)
                 net = MaxPooling2D((3, 3), strides=(2, 2), name='pool1')(net)
 
@@ -128,31 +129,28 @@ def PoseNet(input_shape=(None, 368, 368, 3)):
                 net = identity_block(net, 3, [256, 256, 1024], stage=4, block='f')
 
                 net = conv_block(net, 3, [512, 512, 1024], stage=5, block='a', relu_alpha=0.01)
-
                 net = Conv2D(256, 1, name='res5b_branch2a_new')(net)
                 net = Activation('relu', name='res5b_branch2a_relu')(net)
 
                 net = Conv2D(128, 3, padding='same', name='res5b_branch2b_new')(net)
                 net = Activation('relu', name='res5b_branch2b_relu')(net)
-
                 net = Conv2D(256, 1, name='res5b_branch2c_new')(net)
                 res_5b = Activation('relu', name='res5b_relu')(net)
-
                 net = Conv2DTranspose(63, 4, strides=(2, 2), padding='same', use_bias=False, name='res5c_branch1a')(res_5b)
-                delta_x, delta_y, delta_z = split(net, [21, 21, 21], axis=bn_axis, name='split_res5c_branch1a')
+                delta_x, delta_y, delta_z = split(net, [21, 21, 21], axis=-1, name='split_res5c_branch1a')
                 sqr = layers.multiply([net, net], name='res5c_branch1a_sqr')
-                x_sqr, y_sqr, z_sqr = split(sqr, [21, 21, 21], axis=bn_axis, name='split_res5c_branch1a_sqr')
+                x_sqr, y_sqr, z_sqr = split(sqr, [21, 21, 21], axis=-1, name='split_res5c_branch1a_sqr')
                 bone_length_sqr = layers.add([x_sqr, y_sqr, z_sqr], name='res5c_bone_length_sqr')
                 res5c_bone_length = tf.pow(bone_length_sqr, 0.5, name='res5c_bone_length')
 
                 net = Conv2DTranspose(128, 4, strides=(2, 2), padding='same', use_bias=False, name='res5c_branch2a')(res_5b)
                 net = BatchNormalization(axis=bn_axis, name='bn5c_branch2a')(net)
                 net = Activation('relu', name='res5c_branch2a_relu')(net)
-                net = layers.concatenate([net, delta_x, delta_y, delta_z, res5c_bone_length], axis=bn_axis, name="res5c_branch2a_feat")
+                net = layers.concatenate([net, delta_x, delta_y, delta_z, res5c_bone_length], axis=-1, name="res5c_branch2a_feat")
                 net = Conv2D(128, 3, padding='same', name='res5c_branch2b')(net)
                 net = Activation('relu', name='res5c_branch2b_relu')(net)
                 net = Conv2D(84, 1, use_bias=False, name='res5c_branch2c')(net)
-                heatmap, x_heatmap, y_heatmap, z_heatmap = split(net, [21, 21, 21, 21], axis=bn_axis, name='slice_heatmaps')
+                heatmap, x_heatmap, y_heatmap, z_heatmap = split(net, [21, 21, 21, 21], axis=-1, name='slice_heatmaps')
         return img_input, (heatmap, x_heatmap, y_heatmap, z_heatmap)
 
 
@@ -180,41 +178,43 @@ def load_weights(sess, model_file):
                                 sess.run(v.assign(f[name]['bias'][:]))
         f.close()
 
-def pad_image(img, target_size): 
+
+def pad_image(img, target_size):
         t_h = target_size[0]
-        t_w = target_size[1] 
-        h = img.shape[0] 
-        w = img.shape[1] 
-        if h==t_h and w==t_w:
-                return img 
-        pad_h = int((t_h-h)/2) 
-        pad_w = int((t_w-w)/2) 
+        t_w = target_size[1]
+        h = img.shape[0]
+        w = img.shape[1]
+        if h == t_h and w == t_w:
+                return img
+        pad_h = int((t_h - h) / 2)
+        pad_w = int((t_w - w) / 2)
         # from IPython import embed; embed()
         img_padded = np.ndarray([t_h, t_w, 3])
         for i in range(3):
-                img_padded[:,:,i] = np.lib.pad(img[:,:,i], ((pad_h,), (pad_w, )), 'constant' )  
-        
+                img_padded[:, :, i] = np.lib.pad(img[:, :, i], ((pad_h,), (pad_w,)), 'constant')
+
         return img_padded
 
 
-def preprocess_img(img): 
+def preprocess_img(img):
         img1 = np.swapaxes(img, 0, 1)
         img1 = img1 / 255 - 0.4
         img2 = cv2.resize(img1, (448, 848))
-        scales = [1,0.8,0.6]
-        img_stack = np.ndarray(shape=[848, 448, 3, 3]) 
+        scales = [1, 0.8, 0.6]
+        img_stack = np.ndarray(shape=[848, 448, 3, 3])
         for i in range(3):
-                # img_resized = img2 
-                # img_resized.resize([int(848 * scales[i]), int(448 * scales[i]), 3]) 
-                img_resized = cv2.resize(img2, (int(448*scales[i]), int(848*scales[i]) ) )
-                img_pad = pad_image(img_resized, [848, 448]) 
-                img_stack[:,:,:,i] = img_pad 
-        # from IPython import embed; embed() 
-        return img_stack 
+                # img_resized = img2
+                # img_resized.resize([int(848 * scales[i]), int(448 * scales[i]), 3])
+                img_resized = cv2.resize(img2, (int(448 * scales[i]), int(848 * scales[i])))
+                img_pad = pad_image(img_resized, [848, 448])
+                img_stack[:, :, :, i] = img_pad
+        # from IPython import embed; embed()
+        return img_stack
 
 
-def postprocess_img(output_stack): 
-        return img 
+def postprocess_img(output_stack):
+        return img
+
 
 def get_pose(img, heatmap, x_map, y_map, z_map):
         print("get pose")
@@ -255,11 +255,11 @@ def show_pose(img, joints2d):
 
 
 def main():
-        crop_size = (848, 448) 
+        crop_size = (848, 448)
         image_shape = (None, 848, 448, 3)
         img_file = '../dataset/mpii_3dhp_ts6/cam5_frame000160.jpg'
         img = cv2.imread(img_file)
-        img_stack = preprocess_img(img) 
+        img_stack = preprocess_img(img)
         K.set_learning_phase(False)
         # img_input, (heatmap, x_heatmap, y_heatmap, z_heatmap) = PoseNet(input_shape=image_shape)
         img_input, output = PoseNet(input_shape=image_shape)
@@ -268,15 +268,15 @@ def main():
                 sess.run(tf.global_variables_initializer())
                 load_weights(sess, 'vnect_model.h5')
                 #out_img = sess.run(heatmap, feed_dict={img_input: [img]})
-                # image_scales[0].shape = (1,54, 28, 21) 
-                img_scale1 = sess.run(output, feed_dict={img_input: [img_stack[:,:,:,0] ]})
-                img_scale2 = sess.run(output, feed_dict={img_input: [img_stack[:,:,:,1] ]})
-                img_scale3 = sess.run(output, feed_dict={img_input: [img_stack[:,:,:,2] ]})
-        from IPython import embed; embed() 
+                # image_scales[0].shape = (1,54, 28, 21)
+                img_scale1 = sess.run(output, feed_dict={img_input: [img_stack[:, :, :, 0]]})
+                img_scale2 = sess.run(output, feed_dict={img_input: [img_stack[:, :, :, 1]]})
+                img_scale3 = sess.run(output, feed_dict={img_input: [img_stack[:, :, :, 2]]})
+        from IPython import embed
+        embed()
         #print(out_img.shape, out_img.dtype)
         # J2d = get_pose(img3, out_[0], out_[1], out_[2], out_[3])
         # show_pose(img3, J2d)
-
 
 
 if __name__ == '__main__':
