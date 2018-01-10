@@ -220,10 +220,12 @@ def show_pose(img, joints2d):
 
 
 def main():
-        image_shape = (None, 540, 540, 3)
+        image_shape = (None, 368, 368, 3)
         img_file = '../dataset/mpii_3dhp_ts6/cam5_frame000160.jpg'
         img = cv2.imread(img_file)
+        from IPython import embed; embed() 
         img = img[:540, 150:690]
+        img2= cv2.resize(img, (368,368)) 
         K.set_learning_phase(False)
         # img_input, (heatmap, x_heatmap, y_heatmap, z_heatmap) = PoseNet(input_shape=image_shape)
         img_input, output = PoseNet(input_shape=image_shape)
@@ -232,11 +234,11 @@ def main():
                 sess.run(tf.global_variables_initializer())
                 load_weights(sess, 'vnect_model.h5')
                 #out_img = sess.run(heatmap, feed_dict={img_input: [img]})
-                out_ = sess.run(output, feed_dict={img_input: [img]})
+                out_ = sess.run(output, feed_dict={img_input: [img2]})
 
         #print(out_img.shape, out_img.dtype)
-        J2d = get_pose(img, out_[0], out_[1], out_[2], out_[3])
-        show_pose(img, J2d)
+        J2d = get_pose(img2, out_[0], out_[1], out_[2], out_[3])
+        show_pose(img2, J2d)
         # plt.imshow(img)
         # plt.show()
         # for i in range(21):
