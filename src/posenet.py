@@ -11,7 +11,7 @@ from tensorflow.python.keras._impl.keras.layers import Activation
 from tensorflow.python.keras._impl.keras.layers import BatchNormalization
 from tensorflow.python.keras._impl.keras.layers import Conv2D
 from tensorflow.python.keras._impl.keras.layers import Conv2DTranspose
-from tensorflow.python.keras._impl.keras.layers import Dense
+from tensorflow.python.keras._impl.keras.layers.advanced_activations import LeakyReLU
 from tensorflow.python.keras._impl.keras.layers import Input
 from tensorflow.python.keras._impl.keras.layers import MaxPooling2D
 import h5py
@@ -54,7 +54,7 @@ def identity_block(input_tensor, kernel_size, filters, stage, block):
         return x
 
 
-def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2)):
+def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2), relu_alpha=0):
         """conv_block is the block that has a conv layer at shortcut.
 
         Arguments:
@@ -90,7 +90,7 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2))
         shortcut = Conv2D(filters3, (1, 1), strides=strides, name=conv_name_base + '1')(input_tensor)
 
         x = layers.add([x, shortcut], name='res' + str(stage) + block)
-        x = Activation('relu', name='res' + str(stage) + block + '_relu')(x)
+        x = LeakyReLU(alpha=relu_alpha, name='res' + str(stage) + block + '_relu')(x)
         return x
 
 
@@ -127,7 +127,7 @@ def PoseNet(input_shape=(None, 368, 368, 3)):
                 net = identity_block(net, 3, [256, 256, 1024], stage=4, block='e')
                 net = identity_block(net, 3, [256, 256, 1024], stage=4, block='f')
 
-                net = conv_block(net, 3, [512, 512, 1024], stage=5, block='a')
+                net = conv_block(net, 3, [512, 512, 1024], stage=5, block='a', relu_alpha=0.01)
 
                 net = Conv2D(256, 1, name='res5b_branch2a_new')(net)
                 net = Activation('relu', name='res5b_branch2a_relu')(net)
