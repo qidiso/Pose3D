@@ -63,8 +63,8 @@ def get_heatmap(output_stack, scales):
         xmap = np.zeros(hm_size) 
         ymap = np.zeros(hm_size) 
         zmap = np.zeros(hm_size) 
-        # for i in range( len(scales) ): 
-        for i in range(3): 
+        for i in range( len(scales) ): 
+        # for i in range(3): 
                 raw_heatmap = output_stack[i][0][0] 
                 raw_xmap = output_stack[i][1][0] 
                 raw_ymap = output_stack[i][2][0] 

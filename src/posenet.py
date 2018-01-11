@@ -166,14 +166,14 @@ def load_weights(sess, model_file):
                         elif content == 'beta':
                                 sess.run(v.assign(f['scale5c_branch2a']['bias'][:]))
                         elif content == 'moving_mean':
-                                sess.run(v.assign(f['bn5c_branch2a']['weights'][:]))
-                        elif content == 'moving_variance':
                                 sess.run(v.assign(f['bn5c_branch2a']['bias'][:]))
+                        elif content == 'moving_variance':
+                                sess.run(v.assign(f['bn5c_branch2a']['weights'][:]))
                 else:
                         if name[:12] == 'res5a_branch':
                                 name = name + '_new'
                         if content == 'kernel':
-                                sess.run(v.assign(f[name]['weights'][:].transpose((2, 3, 1, 0))))
+                                sess.run(v.assign(f[name]['weights'][:].transpose((3, 2, 1, 0))))
                         elif content == 'bias':
                                 sess.run(v.assign(f[name]['bias'][:]))
         f.close()
@@ -200,7 +200,7 @@ def main():
                 img_scale3 = sess.run(output, feed_dict={img_input: [img_stack[:, :, :, 2]]})
         output_stack = [img_scale1, img_scale2, img_scale3] 
         heatmap, xmap, ymap, zmap = get_heatmap(output_stack, scales) 
-        # from IPython import embed; embed()
+        from IPython import embed; embed()
         J2d, J3d = get_pose(img, heatmap, xmap, ymap ,zmap) 
         show_pose(img, J2d) 
 
