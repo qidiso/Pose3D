@@ -19,7 +19,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import cv2
 from matplotlib.patches import Circle
-
+from utils.img_process import * 
 
 def identity_block(input_tensor, kernel_size, filters, stage, block):
         """The identity block is the block that has no conv layer at shortcut.
@@ -179,87 +179,13 @@ def load_weights(sess, model_file):
         f.close()
 
 
-def pad_image(img, target_size):
-        t_h = target_size[0]
-        t_w = target_size[1]
-        h = img.shape[0]
-        w = img.shape[1]
-        if h == t_h and w == t_w:
-                return img
-        pad_h = int((t_h - h) / 2)
-        pad_w = int((t_w - w) / 2)
-        # from IPython import embed; embed()
-        img_padded = np.ndarray([t_h, t_w, 3])
-        for i in range(3):
-                img_padded[:, :, i] = np.lib.pad(img[:, :, i], ((pad_h,), (pad_w,)), 'constant')
-
-        return img_padded
-
-
-def preprocess_img(img):
-        img1 = np.swapaxes(img, 0, 1)
-        img1 = img1 / 255 - 0.4
-        img2 = cv2.resize(img1, (448, 848))
-        scales = [1, 0.8, 0.6]
-        img_stack = np.ndarray(shape=[848, 448, 3, 3])
-        for i in range(3):
-                # img_resized = img2
-                # img_resized.resize([int(848 * scales[i]), int(448 * scales[i]), 3])
-                img_resized = cv2.resize(img2, (int(448 * scales[i]), int(848 * scales[i])))
-                img_pad = pad_image(img_resized, [848, 448])
-                img_stack[:, :, :, i] = img_pad
-        # from IPython import embed; embed()
-        return img_stack
-
-
-def postprocess_img(output_stack):
-        return img
-
-
-def get_pose(img, heatmap, x_map, y_map, z_map):
-        print("get pose")
-        img_w = img.shape[1]
-        img_h = img.shape[0]
-        heat_w = heatmap.shape[2]
-        heat_h = heatmap.shape[1]
-        joints2d = np.ndarray(shape=[2, 21], dtype=float)
-        joints3d = np.ndarray(shape=[3, 21], dtype=float)
-
-        for i in range(21):
-                hm = heatmap[0, :, :, i]
-                ind = np.argmax(hm)
-                w = ind % hm.shape[1]
-                h = int(ind / hm.shape[1])
-                w_ori = int(img_w * w / heat_w)
-                h_ori = int(img_h * h / heat_h)
-                joints2d[0, i] = h_ori
-                joints2d[1, i] = w_ori
-
-        # from IPython import embed; embed()
-        return joints2d
-
-
-def show_pose(img, joints2d):
-        # fig, ax = plt.subplots(1)
-        # ax.set_aspect('equal')
-        # ax.imshow(img)
-        # # for i in range(21):
-        # 	circ = Circle((joints2d[0,i], joints2d[1,i]), 10)
-        # 	ax.add_patch(circ)
-        # # plt.show()
-        for i in range(21):
-                cv2.circle(img, (int(joints2d[1, i]), int(joints2d[0, i])), 10, (0, 0, 255), -1)
-        cv2.imshow('image', img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-
 def main():
         crop_size = (848, 448)
+        scales = [1, 0.8, 0.6]
         image_shape = (None, 848, 448, 3)
-        img_file = '../dataset/mpii_3dhp_ts6/cam5_frame000160.jpg'
+        img_file = '../dataset/mpii_3dhp_ts6/cam5_frame000136.jpg'
         img = cv2.imread(img_file)
-        img_stack = preprocess_img(img)
+        img_stack = preprocess_img(img, scales)
         K.set_learning_phase(False)
         # img_input, (heatmap, x_heatmap, y_heatmap, z_heatmap) = PoseNet(input_shape=image_shape)
         img_input, output = PoseNet(input_shape=image_shape)
@@ -272,11 +198,11 @@ def main():
                 img_scale1 = sess.run(output, feed_dict={img_input: [img_stack[:, :, :, 0]]})
                 img_scale2 = sess.run(output, feed_dict={img_input: [img_stack[:, :, :, 1]]})
                 img_scale3 = sess.run(output, feed_dict={img_input: [img_stack[:, :, :, 2]]})
-        from IPython import embed
-        embed()
-        #print(out_img.shape, out_img.dtype)
-        # J2d = get_pose(img3, out_[0], out_[1], out_[2], out_[3])
-        # show_pose(img3, J2d)
+        output_stack = [img_scale1, img_scale2, img_scale3] 
+        heatmap, xmap, ymap, zmap = get_heatmap(output_stack, scales) 
+        # from IPython import embed; embed()
+        J2d, J3d = get_pose(img, heatmap, xmap, ymap ,zmap) 
+        show_pose(img, J2d) 
 
 
 if __name__ == '__main__':
