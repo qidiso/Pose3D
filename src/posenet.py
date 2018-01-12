@@ -107,8 +107,8 @@ def PoseNet(input_shape=(None, 368, 368, 3)):
                 bn_axis = 1
 
         with tf.variable_scope("vnect"):
-                padded_input = tf.pad(img_input, [[0, 0], [3, 3], [3, 3], [0, 0]], "CONSTANT")
-                net = Conv2D(64, 7, strides=(2, 2), name='conv1')(padded_input)
+                # padded_input = tf.pad(img_input, [[0, 0], [3, 3], [3, 3], [0, 0]], "CONSTANT")
+                net = Conv2D(64, 7, strides=(2, 2), name='conv1', padding='same')(img_input)
                 net = Activation('relu', name='conv1_relu')(net)
                 net = MaxPooling2D((3, 3), strides=(2, 2), name='pool1')(net)
 
@@ -193,16 +193,21 @@ def main():
         with tf.Session() as sess:
                 sess.run(tf.global_variables_initializer())
                 load_weights(sess, 'vnect_model.h5')
-                #out_img = sess.run(heatmap, feed_dict={img_input: [img]})
-                # image_scales[0].shape = (1,54, 28, 21)
                 img_scale1 = sess.run(output, feed_dict={img_input: [img_stack[:, :, :, 0]]})
                 img_scale2 = sess.run(output, feed_dict={img_input: [img_stack[:, :, :, 1]]})
                 img_scale3 = sess.run(output, feed_dict={img_input: [img_stack[:, :, :, 2]]})
         output_stack = [img_scale1, img_scale2, img_scale3] 
         heatmap, xmap, ymap, zmap = get_heatmap(output_stack, scales) 
+        # for i in range(21):
+        #         plt.imshow(heatmap[:,:,i]) 
+        #         plt.show() 
+        ori_hm = img_scale1[0] 
+        for i in range(21):
+                plt.imshow(ori_hm[0,:,:,i])
+                plt.show() 
         from IPython import embed; embed()
-        J2d, J3d = get_pose(img, heatmap, xmap, ymap ,zmap) 
-        show_pose(img, J2d) 
+        # J2d, J3d = get_pose(img, heatmap, xmap, ymap ,zmap) 
+        # show_pose(img, J2d) 
 
 
 if __name__ == '__main__':

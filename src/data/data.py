@@ -6,7 +6,15 @@ import time
 import numpy as np 
 import tensorflow as tf 
 
-
+## Typical pipeline for reading data for training 
+# The list of filenames
+# Optional filename shuffling
+# Optional epoch limit
+# Filename queue
+# A Reader for the file format
+# A decoder for a record read by the reader
+# Optional preprocessing
+# Example queue
 # first step: create dataset 
 # create iterator 
 sess = tf.Session() 
