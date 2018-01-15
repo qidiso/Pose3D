@@ -118,3 +118,6 @@ venv.bak/
 *.log
 *.bbl 
 *.pdf
+*.fdb_latexmk 
+*.fls
+
