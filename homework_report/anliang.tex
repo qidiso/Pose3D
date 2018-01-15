@@ -1,0 +1,81 @@
+\documentclass[a4paper, 10pt]{article}
+\usepackage[top=0.5in, bottom=0.5in, left=1in, right=1in]{geometry}
+% \usepackage[utf8]{inputenc}
+% \usepackage[slantfont,boldfont]{xeCJK}
+\usepackage{xeCJK} 
+
+\usepackage{fontspec} 
+% \setCJKmainfont{Noto Sans CJK SC} 
+% \setCJKmainfont{Noto Sans CJK SC Regular}
+\setCJKmainfont[BoldFont=SimHei, ItalicFont=KaiTi]{SimSun}
+% \setCJKmainfont{AR PL UMing CN}
+\setmainfont{Times New Roman} 
+% \setmainfont{Arial}
+% \setsansfont{Arial} 
+\usepackage{latexsym} 
+\usepackage{amsmath,amssymb,amsfonts} 
+\usepackage{color,xcolor} 
+\usepackage{graphicx} 
+\usepackage{tabu}
+\usepackage{booktabs}
+\usepackage{bm}
+\usepackage{footnote}
+\usepackage{url}
+% \usepackage{subcaptionbox}
+% \usepackage{subfigure}
+
+\title{2D人体骨架识别}
+\author{
+安亮\\
+2017310876
+\and 
+秦钰超(coauthor)\\
+2017210955
+}
+\begin{document}
+\maketitle
+\pagestyle{plain}
+\setlength{\parindent}{2em}
+\makeatletter
+\renewcommand{\section}{\@startsection{section}{1}{0mm}
+{0.5\baselineskip}{0.5\baselineskip}
+{\Large\bf\leftline}}
+\makeatother
+
+\section{摘要}
+本工作参考VNect实现了一个用于2D人体骨架检测的巻积神经网络。在测试数据上，该网络能够对部分人体关节点实现比较准确的检测。代码参见github\footnote{\url{https://github.com/anl13/Pose3D}}。
+
+\section{研究问题}
+人体骨架，又称人体关键点，指的是能反应人体姿态的关节点，例如肘、肩等。人体关键点检测（或人体骨架识别）指的是在一张或者多张图片
+中，利用计算机算法标注出人体关键点在图像中的位置。这是计算机视觉领域广受关注的任务，也是实现人机交互的核心问题。
+随着神经网络技术的广泛应用，利用神经网络解决诸如人体关键点检测等问题成为研究热点。CPM \cite{wei2016convolutional}首先实现了利用
+巻积神经网络检测单人人体关键点，随后openpose\cite{cao2016realtime}成功使用巻积神经网络实现了单张图片多人体关节点检测。
+最近，利用单张图片实现3D人体关键点检测也获得了很大关注，\cite{newell2016stacked}设计了特殊的巻积网络结构——stacked hourglass实现了较为
+精确的单人体3D骨架识别。VNECT\cite{mehta2017vnect}则将2D人体关键点检测与坐标估计结合起来，实现了实时单人3D关键点检测与跟踪。
+
+本工作研究的问题是单图片单人2D人体骨架检测问题。本工作参考VNECT中的2D骨架识别网络的网络结构，利用tensorflow\cite{abadi2016tensorflow}
+予以实现，并在少量数据上进行了效果测试。
+
+\section{采用数据}
+本文主要采用的数据是mpi-inf-3dhp\cite{mehta2017monocular}。这是一个单人体数据集，带有2D和3D的关节标注。由于时间问题，本文并没有
+利用该数据进行训练，而是直接迁移了VNECT训练出的模型参数，并在该数据集的个别图像上进行了测试。
+
+
+\section{研究方法}
+本文采用如下网络结构。
+
+本文将VNECT参数导入。
+
+本文利用数据进行了测试。
+
+\section{分析结果}
+
+
+\section{讨论}
+
+
+
+\bibliographystyle{splncs}
+\bibliography{ref.bib}
+
+\end{document}

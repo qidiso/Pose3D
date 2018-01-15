@@ -111,3 +111,10 @@ venv.bak/
 
 
 *.png
+
+# tex 
+*.aux
+*.blg
+*.log
+*.bbl 
+*.pdf
