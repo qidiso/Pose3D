@@ -2,20 +2,20 @@
 \usepackage[top=0.5in, bottom=0.5in, left=1in, right=1in]{geometry}
 % \usepackage[utf8]{inputenc}
 % \usepackage[slantfont,boldfont]{xeCJK}
-\usepackage{xeCJK} 
+\usepackage{xeCJK}
 
-\usepackage{fontspec} 
-% \setCJKmainfont{Noto Sans CJK SC} 
+\usepackage{fontspec}
+% \setCJKmainfont{Noto Sans CJK SC}
 % \setCJKmainfont{Noto Sans CJK SC Regular}
 \setCJKmainfont[BoldFont=SimHei, ItalicFont=KaiTi]{SimSun}
 % \setCJKmainfont{AR PL UMing CN}
-\setmainfont{Times New Roman} 
+\setmainfont{Times New Roman}
 % \setmainfont{Arial}
-% \setsansfont{Arial} 
-\usepackage{latexsym} 
-\usepackage{amsmath,amssymb,amsfonts} 
-\usepackage{color,xcolor} 
-\usepackage{graphicx} 
+% \setsansfont{Arial}
+\usepackage{latexsym}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{color,xcolor}
+\usepackage{graphicx}
 \usepackage{tabu}
 \usepackage{booktabs}
 \usepackage{bm}
@@ -28,7 +28,7 @@
 \author{
 安亮\\
 2017310876
-\and 
+\and
 秦钰超(coauthor)\\
 2017210955
 }
@@ -74,13 +74,21 @@ heatmap上能量最高的位置就是该关节点出现概率最大的位置。�
 \begin{figure}[ht!]
     \centering
     \includegraphics[width=\linewidth]{pic/net_struct.png}
-    \label{pic:net_struct} 
+    \label{pic:net_struct}
     \caption{网络结构\footnote{图片来源与论文\cite{mehta2017vnect}}。}
 \end{figure}
 
-本文将VNECT参数导入。
+对于该网络，我们考虑直接把参数从VNECT网络训练出的参数迁移过来。然而，这里面也面临一些问题。原来的VNECT网络是用caffe架构训练出来的，参数表达的结构
+也是caffe的结构。两种网络的参数在卷积核的维度顺序等方面有不少区别，我们在转换的时候进行了很多次尝试。然而，最终我们转移过来的参数并没有表现出完美的
+结果，但仍然在部分关节的检测中展示出了不错的结果\footnote{这部分工作主要由秦钰超同学完成}。
 
-本文利用数据进行了测试。
+\subsection{数据处理}
+为了使图片转换为神经网络容易处理的形势，我们对图像进行了预处理和后处理\footnote{这部分工作主要由我完成}。
+
+在预处理方面，考虑到我们的神经网络输出的heatmap的宽和高是输入图像的$1/8$，为了对输出图像做更好的处理，对于一个输入的图像$I$，我们首先会对图像进行尺度上的放缩，
+将宽和高放缩到8的整数倍。其次，原输入图像每个像素点的值的范围是$(0,255)$，这种过大的取值范围对于神经网络是不友好的。因此，我们将像素点的值放缩到$(-0.4,0.6)$。
+
+在后处理方面，我们将heatmap的尺度和值范围还原到原图，并提取heatmap最大值的坐标作为关节估计位置。
 
 \section{分析结果}
 
