@@ -62,7 +62,21 @@
 
 
 \section{研究方法}
-本文采用如下网络结构。
+\subsection{网络结构}
+本文使用了
+图\ref{pic:net_struct}展示了我们使用的网络结构。其中，我们最终利用的输出仅为H层，也就是2D关节点heatmap层。在这个网络中，针对每个关节点会输出一个heatmap，
+heatmap上能量最高的位置就是该关节点出现概率最大的位置。因此，最终输出的heatmap张量的维度为(N,H,W,C)，N是输入图像的数量（在测试的时候一般为1)，H是和heatmap图像的高度
+（在该网络中是输入图像的$1/8$，W相同），W是heatmap图像的高度，C是heatmap图像的通道数，在该网络中为21,对应待检测的关节点数量。
+
+这个网络有两个优点。第一，网络的前端使用了ResNet\cite{he2016deep}作为特征提取器，通过迁移ResNet在imagenet上训练好的参数可以加速网络训练的收敛速度。
+第二，使用了全巻积的结构（除了计算关节长度部分），使得网络适应任何大小的图片输入。
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\linewidth]{pic/net_struct.png}
+    \label{pic:net_struct} 
+    \caption{网络结构\footnote{图片来源与论文\cite{mehta2017vnect}}。}
+\end{figure}
 
 本文将VNECT参数导入。
 
